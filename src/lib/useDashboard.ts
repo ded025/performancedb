@@ -15,17 +15,20 @@ export type APYearly = {
   apName: string;
   rmName: string;
   createdFY?: string;
+  createdTime?: string;
   leadStatus: string;
   accounts: number;
   activeAccounts: number;
   revenue: number;
   commission: number;
+  orders: number;
   monthly: {
     month: string;
     accounts: number;
     active: number;
     revenue: number;
     commission: number;
+    orders: number;
   }[];
 };
 
@@ -45,6 +48,7 @@ export type DashboardData = {
     activeAccounts: number;
     revenue: number;
     commission: number;
+    orders: number;
     partners: number;
     contributionPct: number;
   }[];
@@ -57,12 +61,14 @@ export type DashboardData = {
     revenue: number;
     commission: number;
     onboardings: number;
+    orders: number;
   }[];
   totals: {
     accounts: number;
     activeAccounts: number;
     revenue: number;
     commission: number;
+    orders: number;
     partners: number;
     newOnboardings: number;
     arpu: number;
@@ -72,6 +78,15 @@ export type DashboardData = {
   rmList: string[];
   onboardingFYList: string[];
 };
+
+// Slab-based commission rate on monthly revenue per AP
+function commissionRate(monthlyRevenue: number): number {
+  if (monthlyRevenue <= 99999) return 0.3;
+  if (monthlyRevenue <= 199999) return 0.4;
+  return 0.5;
+}
+
+const REVENUE_PER_ORDER = 20;
 
 export function useInvalidateData() {
   const qc = useQueryClient();
