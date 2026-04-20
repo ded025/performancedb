@@ -94,11 +94,14 @@ export function parsePartners(rows: Record<string, unknown>[]): Partner[] {
 export function parseAccountsForMonth(
   rows: Record<string, unknown>[],
   month: MonthKey,
+  validApCodes?: Set<string>,
 ): MonthlyAccount[] {
   const map = new Map<string, { opened: number; firstTrades: number }>();
   for (const r of rows) {
     const ap = toStr(pick(r, ["Sub source", "Sub Source", "SubSource", "AP Code"]));
     if (!ap) continue;
+    if (!/^AP/i.test(ap)) continue;
+    if (validApCodes && !validApCodes.has(ap)) continue;
     const opened = toDate(pick(r, ["Account opened date", "Account Opened Date", "Opened Date"]));
     const ft = toDate(pick(r, ["First trade date", "First Trade Date", "FT Date"]));
     const cur = map.get(ap) ?? { opened: 0, firstTrades: 0 };
@@ -134,6 +137,7 @@ function extractApFromClientId(v: unknown): string {
 export function parseRevenueForMonth(
   rows: Record<string, unknown>[],
   month: MonthKey,
+  validApCodes?: Set<string>,
 ): MonthlyRevenue[] {
   const map = new Map<string, { tot: number; intro: number }>();
   for (const r of rows) {
@@ -142,6 +146,8 @@ export function parseRevenueForMonth(
       ap = extractApFromClientId(pick(r, ["Client Id", "Client ID", "ClientId", "Client_Id"]));
     }
     if (!ap) continue;
+    if (!/^AP/i.test(ap)) continue;
+    if (validApCodes && !validApCodes.has(ap)) continue;
     const tot = toNum(pick(r, ["Total Brk", "Total Brokerage", "Total_Brk"]));
     const intro = toNum(pick(r, ["Introducer Brk", "Introducer Brokerage", "Intro Brk"]));
     const cur = map.get(ap) ?? { tot: 0, intro: 0 };
