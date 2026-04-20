@@ -22,17 +22,17 @@ export const Route = createFileRoute("/settings")({
 
 function SettingsPage() {
   const { isAdmin, loading } = useAuth();
-  if (loading) return null;
-  if (!isAdmin) {
-    throw redirect({ to: "/" });
-  }
-
   const invalidate = useInvalidateData();
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const [pct, setPct] = useState("20");
   useEffect(() => {
     if (settings) setPct(String(settings.defaultCommissionPct));
   }, [settings]);
+
+  if (loading) return null;
+  if (!isAdmin) {
+    throw redirect({ to: "/" });
+  }
 
   return (
     <div className="p-6 space-y-4 max-w-3xl mx-auto">
