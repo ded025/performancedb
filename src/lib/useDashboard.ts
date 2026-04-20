@@ -33,6 +33,7 @@ export type DashboardFilters = {
   reportFY: FY;
   onboardingFY: FY | "ALL";
   rm: string | "ALL";
+  months?: string[];
 };
 
 export type DashboardData = {
@@ -47,6 +48,8 @@ export type DashboardData = {
     partners: number;
     contributionPct: number;
   }[];
+  rmMonthly: { month: string; [rmName: string]: number | string }[];
+  rmNames: string[];
   monthly: {
     month: string;
     accounts: number;
@@ -62,6 +65,9 @@ export type DashboardData = {
     commission: number;
     partners: number;
     newOnboardings: number;
+    arpu: number;
+    revPerPartner: number;
+    activationRate: number;
   };
   rmList: string[];
   onboardingFYList: string[];
