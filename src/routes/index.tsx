@@ -133,9 +133,10 @@ function Dashboard() {
                 <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
                 <Tooltip
-                  formatter={(v: number, name) =>
-                    name === "Revenue" ? [`₹ ${fmt(v)}`, name] : [fmt(v), name]
-                  }
+                  formatter={(v, name) => {
+                    const num = Number(v) || 0;
+                    return name === "Revenue" ? [`₹ ${fmt(num)}`, String(name)] : [fmt(num), String(name)];
+                  }}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
