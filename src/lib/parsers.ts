@@ -58,7 +58,20 @@ export function parsePartners(rows: Record<string, unknown>[]): Partner[] {
       return {
         apCode,
         apName: toStr(pick(r, ["AP Name", "Partner Name", "Name"])),
-        rmName: toStr(pick(r, ["RM Name", "RM"])),
+        rmName: toStr(
+          pick(r, [
+            "AP Master Owner",
+            "AP Master owner",
+            "Ap Master Owner",
+            "Master Owner",
+            "Owner",
+            "RM Name",
+            "RM",
+            "Relationship Manager",
+            "Sales Owner",
+            "Assigned To",
+          ]),
+        ),
         leadStatus: toStr(pick(r, ["Lead Status", "LeadStatus", "Status"])),
         status: toStr(pick(r, ["Status"])),
         createdTime: created ? created.toISOString() : undefined,
@@ -202,7 +215,9 @@ export function parseHistoricalFY2526(
     const partner: Partner = {
       apCode,
       apName: toStr(pick(r, ["AP Name"])),
-      rmName: toStr(pick(r, ["RM Name"])),
+      rmName: toStr(
+        pick(r, ["AP Master Owner", "Master Owner", "Owner", "RM Name", "RM", "Relationship Manager"]),
+      ),
       leadStatus: toStr(pick(r, ["Lead Status", "Status"])),
       status: toStr(pick(r, ["Status"])),
       createdTime: created ? created.toISOString() : undefined,
