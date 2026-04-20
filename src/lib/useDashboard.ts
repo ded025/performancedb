@@ -85,8 +85,8 @@ export function useInvalidateData() {
 }
 
 export function useDashboardData(filters: DashboardFilters): DashboardData | undefined {
-  const { user } = useAuth();
-  const enabled = !!user;
+  const { isAuthed } = useAuth();
+  const enabled = isAuthed;
 
   const partnersQ = useQuery({ queryKey: ["partners"], queryFn: fetchPartners, enabled });
   const accountsQ = useQuery({ queryKey: ["monthlyAccounts"], queryFn: fetchMonthlyAccounts, enabled });

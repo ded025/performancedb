@@ -73,19 +73,19 @@ function RootComponent() {
 }
 
 function AuthGate() {
-  const { user, loading } = useAuth();
+  const { isAuthed, loading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     if (loading) return;
-    if (!user && pathname !== "/auth") {
+    if (!isAuthed && pathname !== "/auth") {
       navigate({ to: "/auth" });
     }
-    if (user && pathname === "/auth") {
+    if (isAuthed && pathname === "/auth") {
       navigate({ to: "/" });
     }
-  }, [user, loading, pathname, navigate]);
+  }, [isAuthed, loading, pathname, navigate]);
 
   if (loading) {
     return (
@@ -95,8 +95,7 @@ function AuthGate() {
     );
   }
 
-  if (!user) {
-    // Render the auth route content directly without shell
+  if (!isAuthed) {
     return <Outlet />;
   }
 

@@ -14,7 +14,7 @@ const NAV = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
-  const { user, role, isAdmin, signOut } = useAuth();
+  const { role, isAdmin, signOut } = useAuth();
 
   const visibleNav = NAV.filter((n) => !n.adminOnly || isAdmin);
 
@@ -47,17 +47,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="mt-auto p-4 space-y-3 border-t border-sidebar-border">
-          <div className="text-xs">
-            <div className="font-medium truncate">{user?.email}</div>
-            {role && (
-              <Badge variant={isAdmin ? "default" : "secondary"} className="mt-1 text-[10px]">
-                {role}
-              </Badge>
-            )}
-          </div>
+          {role && (
+            <Badge variant={isAdmin ? "default" : "secondary"} className="text-[10px]">
+              {role}
+            </Badge>
+          )}
           <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground/80" onClick={() => signOut()}>
             <LogOut className="h-4 w-4 mr-2" />
-            Sign out
+            Exit
           </Button>
         </div>
       </aside>

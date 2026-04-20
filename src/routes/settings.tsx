@@ -21,7 +21,7 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsPage() {
-  const { isAdmin, loading, roleLoading, user } = useAuth();
+  const { isAdmin, loading } = useAuth();
   const invalidate = useInvalidateData();
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const [pct, setPct] = useState("20");
@@ -29,7 +29,7 @@ function SettingsPage() {
     if (settings) setPct(String(settings.defaultCommissionPct));
   }, [settings]);
 
-  if (loading || roleLoading || !user) {
+  if (loading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   }
   if (!isAdmin) {
