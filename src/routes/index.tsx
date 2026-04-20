@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useDashboardData } from "@/lib/useDashboard";
-import { listFYs, currentFY, monthLabelFromKey, bucketLabel } from "@/lib/fy";
+import { listFYs, currentFY, monthLabelFromKey, bucketLabel, fyMonthKeys, FY_MONTH_LABELS } from "@/lib/fy";
 import { Card } from "@/components/ui/card";
 import {
   Select,
@@ -10,6 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -31,6 +37,7 @@ import {
   Line,
 } from "recharts";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Dashboard — AP Performance" }] }),
@@ -44,14 +51,32 @@ const fmt = (n: number) =>
       ? `${(n / 1e5).toFixed(2)} L`
       : n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
+const RM_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "hsl(280 60% 55%)",
+  "hsl(20 80% 55%)",
+  "hsl(160 50% 45%)",
+];
+
 function Dashboard() {
   const fys = listFYs(2024, 6);
   const [reportFY, setReportFY] = useState(currentFY());
   const [onboardingFY, setOnboardingFY] = useState<string>("ALL");
   const [rm, setRm] = useState<string>("ALL");
   const [search, setSearch] = useState("");
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
 
-  const data = useDashboardData({ reportFY, onboardingFY: onboardingFY as never, rm });
+  const fyMonths = useMemo(() => fyMonthKeys(reportFY), [reportFY]);
+  const data = useDashboardData({
+    reportFY,
+    onboardingFY: onboardingFY as never,
+    rm,
+    months: selectedMonths,
+  });
 
   const filteredAP = useMemo(() => {
     if (!data) return [];
@@ -64,6 +89,13 @@ function Dashboard() {
         a.rmName.toLowerCase().includes(q),
     );
   }, [data, search]);
+
+  const monthLabel =
+    selectedMonths.length === 0
+      ? "All months"
+      : selectedMonths.length === 1
+        ? monthLabelFromKey(selectedMonths[0])
+        : `${selectedMonths.length} months`;
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
@@ -87,7 +119,13 @@ function Dashboard() {
             </Select>
           </FilterField>
           <FilterField label="Report FY">
-            <Select value={reportFY} onValueChange={setReportFY}>
+            <Select
+              value={reportFY}
+              onValueChange={(v) => {
+                setReportFY(v);
+                setSelectedMonths([]);
+              }}
+            >
               <SelectTrigger className="w-[140px] h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {fys.map((f) => (
@@ -95,6 +133,49 @@ function Dashboard() {
                 ))}
               </SelectContent>
             </Select>
+          </FilterField>
+          <FilterField label="Months">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-9 w-[170px] justify-start font-normal">
+                  {monthLabel}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3 space-y-2" align="end">
+                <div className="flex justify-between text-xs">
+                  <button
+                    onClick={() => setSelectedMonths(fyMonths)}
+                    className="text-primary hover:underline"
+                  >
+                    Select all
+                  </button>
+                  <button
+                    onClick={() => setSelectedMonths([])}
+                    className="text-muted-foreground hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {fyMonths.map((m, i) => {
+                    const checked = selectedMonths.includes(m);
+                    return (
+                      <label key={m} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(c) => {
+                            setSelectedMonths((prev) =>
+                              c ? [...prev, m] : prev.filter((x) => x !== m),
+                            );
+                          }}
+                        />
+                        {FY_MONTH_LABELS[i]}
+                      </label>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </FilterField>
           <FilterField label="RM">
             <Select value={rm} onValueChange={setRm}>
@@ -119,11 +200,29 @@ function Dashboard() {
         <KPI label="Commission" value={`₹ ${fmt(data?.totals.commission ?? 0)}`} />
       </div>
 
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <KPI
+          label="Avg Revenue / Partner"
+          value={`₹ ${fmt(data?.totals.revPerPartner ?? 0)}`}
+          hint="Across revenue-generating APs"
+        />
+        <KPI
+          label="ARPU"
+          value={`₹ ${fmt(data?.totals.arpu ?? 0)}`}
+          hint="Revenue / Active accounts"
+        />
+        <KPI
+          label="Activation Rate"
+          value={`${(data?.totals.activationRate ?? 0).toFixed(1)}%`}
+          hint="Active / Accounts opened"
+        />
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2 p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold">Month-on-Month — {reportFY}</h2>
-            <div className="text-xs text-muted-foreground">Revenue & Accounts</div>
+            <div className="text-xs text-muted-foreground">Revenue, Accounts, Active</div>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -141,7 +240,7 @@ function Dashboard() {
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
                 <Bar yAxisId="right" dataKey="accounts" name="Accounts" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="right" type="monotone" dataKey="active" name="Active" stroke="var(--chart-4)" strokeWidth={2} dot={false} />
+                <Bar yAxisId="right" dataKey="active" name="Active" fill="var(--chart-4)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -165,6 +264,35 @@ function Dashboard() {
           </div>
         </Card>
       </div>
+
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="font-semibold">RM-wise Revenue (Stacked) — {reportFY}</h2>
+            <p className="text-xs text-muted-foreground">Top {data?.rmNames.length ?? 0} RMs by revenue</p>
+          </div>
+        </div>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={(data?.rmMonthly ?? []).map((m) => ({ ...m, label: monthLabelFromKey(m.month as string) }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v) => `₹ ${fmt(Number(v) || 0)}`} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {(data?.rmNames ?? []).map((rmName, i) => (
+                <Bar
+                  key={rmName}
+                  dataKey={rmName}
+                  stackId="rm"
+                  fill={RM_COLORS[i % RM_COLORS.length]}
+                  radius={i === (data?.rmNames.length ?? 0) - 1 ? [4, 4, 0, 0] : 0}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
 
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">

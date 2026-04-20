@@ -33,6 +33,7 @@ export type DashboardFilters = {
   reportFY: FY;
   onboardingFY: FY | "ALL";
   rm: string | "ALL";
+  months?: string[];
 };
 
 export type DashboardData = {
@@ -47,6 +48,8 @@ export type DashboardData = {
     partners: number;
     contributionPct: number;
   }[];
+  rmMonthly: { month: string; [rmName: string]: number | string }[];
+  rmNames: string[];
   monthly: {
     month: string;
     accounts: number;
@@ -62,6 +65,9 @@ export type DashboardData = {
     commission: number;
     partners: number;
     newOnboardings: number;
+    arpu: number;
+    revPerPartner: number;
+    activationRate: number;
   };
   rmList: string[];
   onboardingFYList: string[];
@@ -161,6 +167,13 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
     }
   }
 
+  const selectedMonthSet =
+    filters.months && filters.months.length > 0
+      ? new Set(filters.months.filter((m) => monthSet.has(m)))
+      : new Set(months);
+
+  const inScopeMonth = (m: string) => selectedMonthSet.has(m);
+
   const perAP: APYearly[] = [];
   for (const apCode of apCodesInScope) {
     const p = partnerByCode.get(apCode);
@@ -188,16 +201,17 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
       }
       return { month: m, accounts, active, revenue, commission };
     });
+    const filteredMonthly = monthlyArr.filter((x) => inScopeMonth(x.month));
     perAP.push({
       apCode,
       apName: p?.apName ?? apCode,
       rmName: p?.rmName ?? "—",
       createdFY: p?.createdFY,
       leadStatus: p?.leadStatus ?? "",
-      accounts: monthlyArr.reduce((s, x) => s + x.accounts, 0),
-      activeAccounts: monthlyArr.reduce((s, x) => s + x.active, 0),
-      revenue: monthlyArr.reduce((s, x) => s + x.revenue, 0),
-      commission: monthlyArr.reduce((s, x) => s + x.commission, 0),
+      accounts: filteredMonthly.reduce((s, x) => s + x.accounts, 0),
+      activeAccounts: filteredMonthly.reduce((s, x) => s + x.active, 0),
+      revenue: filteredMonthly.reduce((s, x) => s + x.revenue, 0),
+      commission: filteredMonthly.reduce((s, x) => s + x.commission, 0),
       monthly: monthlyArr,
     });
   }
@@ -231,28 +245,51 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const monthly = months.map((m) => {
-    const acc = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.accounts ?? 0), 0);
-    const active = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.active ?? 0), 0);
-    const rev = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.revenue ?? 0), 0);
-    const com = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.commission ?? 0), 0);
-    const onboardings = allPartners.filter((p) => {
-      if (!p.createdTime) return false;
-      const mk = p.createdTime.slice(0, 7);
-      if (mk !== m) return false;
-      if (filters.rm !== "ALL" && p.rmName !== filters.rm) return false;
-      return true;
-    }).length;
-    return { month: m, accounts: acc, active, revenue: rev, commission: com, onboardings };
-  });
+  const rmNames = byRM.slice(0, 8).map((r) => r.rmName);
+
+  const monthly = months
+    .filter(inScopeMonth)
+    .map((m) => {
+      const acc = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.accounts ?? 0), 0);
+      const active = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.active ?? 0), 0);
+      const rev = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.revenue ?? 0), 0);
+      const com = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.commission ?? 0), 0);
+      const onboardings = allPartners.filter((p) => {
+        if (!p.createdTime) return false;
+        const mk = p.createdTime.slice(0, 7);
+        if (mk !== m) return false;
+        if (filters.rm !== "ALL" && p.rmName !== filters.rm) return false;
+        return true;
+      }).length;
+      return { month: m, accounts: acc, active, revenue: rev, commission: com, onboardings };
+    });
+
+  const rmMonthly = months
+    .filter(inScopeMonth)
+    .map((m) => {
+      const row: { month: string; [k: string]: number | string } = { month: m };
+      for (const rmName of rmNames) {
+        row[rmName] = perAP
+          .filter((ap) => (ap.rmName || "—") === rmName)
+          .reduce((s, ap) => s + (ap.monthly.find((mm) => mm.month === m)?.revenue ?? 0), 0);
+      }
+      return row;
+    });
+
+  const totalAccounts = perAP.reduce((s, x) => s + x.accounts, 0);
+  const totalActive = perAP.reduce((s, x) => s + x.activeAccounts, 0);
+  const partnersWithRev = perAP.filter((x) => x.revenue > 0).length;
 
   const totals = {
-    accounts: perAP.reduce((s, x) => s + x.accounts, 0),
-    activeAccounts: perAP.reduce((s, x) => s + x.activeAccounts, 0),
+    accounts: totalAccounts,
+    activeAccounts: totalActive,
     revenue: totalRevenue,
     commission: perAP.reduce((s, x) => s + x.commission, 0),
     partners: perAP.length,
     newOnboardings: monthly.reduce((s, x) => s + x.onboardings, 0),
+    arpu: totalActive > 0 ? totalRevenue / totalActive : 0,
+    revPerPartner: partnersWithRev > 0 ? totalRevenue / partnersWithRev : 0,
+    activationRate: totalAccounts > 0 ? (totalActive / totalAccounts) * 100 : 0,
   };
 
   const rmList = Array.from(new Set(allPartners.map((p) => p.rmName).filter(Boolean))).sort();
@@ -264,6 +301,8 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
     partners: partnersFiltered,
     perAP: perAP.sort((a, b) => b.revenue - a.revenue),
     byRM,
+    rmMonthly,
+    rmNames,
     monthly,
     totals,
     rmList,
