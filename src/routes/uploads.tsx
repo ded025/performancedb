@@ -11,6 +11,7 @@ import {
   replaceHistoricalFY,
   exportAllJSON,
   importAllJSON,
+  fetchPartners,
 } from "@/lib/cloudData";
 import {
   parsePartners,
@@ -42,9 +43,7 @@ function UploadsPage() {
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Uploads</h1>
-          <p className="text-sm text-muted-foreground">
-            Data is stored in the cloud database and visible to all signed-in users.
-          </p>
+          <p className="text-sm text-muted-foreground">Import partner master, then monthly accounts and revenue.</p>
         </div>
         <BackupRestore />
       </div>
@@ -118,8 +117,9 @@ function AccountsUpload() {
           if (!month) return toast.error("Pick a month first");
           setBusy(true);
           try {
-            const rows = await readSheetRows(f);
-            const recs = parseAccountsForMonth(rows, month);
+            const [rows, partners] = await Promise.all([readSheetRows(f), fetchPartners()]);
+            const valid = new Set(partners.map((p) => p.apCode));
+            const recs = parseAccountsForMonth(rows, month, valid);
             await replaceMonthlyAccounts(month, recs);
             invalidate();
             toast.success(`Saved ${recs.length} APs for ${month} (overwrote existing)`);
@@ -157,8 +157,9 @@ function RevenueUpload() {
           if (!month) return toast.error("Pick a month first");
           setBusy(true);
           try {
-            const rows = await readSheetRows(f);
-            const recs = parseRevenueForMonth(rows, month);
+            const [rows, partners] = await Promise.all([readSheetRows(f), fetchPartners()]);
+            const valid = new Set(partners.map((p) => p.apCode));
+            const recs = parseRevenueForMonth(rows, month, valid);
             await replaceMonthlyRevenue(month, recs);
             invalidate();
             toast.success(`Saved revenue for ${recs.length} APs in ${month} (overwrote existing)`);
