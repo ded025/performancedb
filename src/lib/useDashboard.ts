@@ -1,5 +1,5 @@
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, getSettings } from "@/lib/db";
+import { db } from "@/lib/db";
 import type { Partner } from "@/lib/types";
 import { fyMonthKeys, type FY } from "@/lib/fy";
 
@@ -62,11 +62,12 @@ export type DashboardData = {
 
 export function useDashboardData(filters: DashboardFilters): DashboardData | undefined {
   return useLiveQuery(async () => {
-    const [allPartners, settings, allHistorical] = await Promise.all([
+    const [allPartners, settingsRow, allHistorical] = await Promise.all([
       db.partners.toArray(),
-      getSettings(),
+      db.settings.get("global"),
       db.historicalFY.where("fy").equals(filters.reportFY).toArray(),
     ]);
+    const settings = settingsRow ?? { id: "global" as const, defaultCommissionPct: 20 };
 
     const months = fyMonthKeys(filters.reportFY);
 
