@@ -232,7 +232,7 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
   const totalRevenue = perAP.reduce((s, x) => s + x.revenue, 0);
   const rmMap = new Map<
     string,
-    { accounts: number; activeAccounts: number; revenue: number; commission: number; partners: number }
+    { accounts: number; activeAccounts: number; revenue: number; commission: number; orders: number; partners: number }
   >();
   for (const ap of perAP) {
     const key = ap.rmName || "—";
@@ -241,12 +241,14 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
       activeAccounts: 0,
       revenue: 0,
       commission: 0,
+      orders: 0,
       partners: 0,
     };
     cur.accounts += ap.accounts;
     cur.activeAccounts += ap.activeAccounts;
     cur.revenue += ap.revenue;
     cur.commission += ap.commission;
+    cur.orders += ap.orders;
     cur.partners += 1;
     rmMap.set(key, cur);
   }
@@ -267,6 +269,7 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
       const active = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.active ?? 0), 0);
       const rev = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.revenue ?? 0), 0);
       const com = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.commission ?? 0), 0);
+      const ord = perAP.reduce((s, x) => s + (x.monthly.find((mm) => mm.month === m)?.orders ?? 0), 0);
       const onboardings = allPartners.filter((p) => {
         if (!p.createdTime) return false;
         const mk = p.createdTime.slice(0, 7);
@@ -274,7 +277,7 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
         if (filters.rm !== "ALL" && p.rmName !== filters.rm) return false;
         return true;
       }).length;
-      return { month: m, accounts: acc, active, revenue: rev, commission: com, onboardings };
+      return { month: m, accounts: acc, active, revenue: rev, commission: com, orders: ord, onboardings };
     });
 
   const rmMonthly = months
@@ -298,6 +301,7 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
     activeAccounts: totalActive,
     revenue: totalRevenue,
     commission: perAP.reduce((s, x) => s + x.commission, 0),
+    orders: perAP.reduce((s, x) => s + x.orders, 0),
     partners: perAP.length,
     newOnboardings: monthly.reduce((s, x) => s + x.onboardings, 0),
     arpu: totalActive > 0 ? totalRevenue / totalActive : 0,
