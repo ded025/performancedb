@@ -105,13 +105,29 @@ export function parseAccountsForMonth(
 }
 
 // ---------- Revenue (monthly) ----------
+// Client ID contains the AP code (alphanumeric prefix). We extract the leading
+// alphanumeric token from the Client ID. Falls back to AP Code/Sub source columns
+// if explicitly provided.
+function extractApFromClientId(v: unknown): string {
+  const s = toStr(v);
+  if (!s) return "";
+  // Try common patterns: "AP1234-56789", "AP1234_56789", "AP1234/56789", "AP1234 56789"
+  const m = s.match(/^([A-Za-z]*\d+|[A-Za-z0-9]+?)[-_/\s.]/);
+  if (m) return m[1];
+  // No separator — assume the whole string IS the AP code
+  return s;
+}
+
 export function parseRevenueForMonth(
   rows: Record<string, unknown>[],
   month: MonthKey,
 ): MonthlyRevenue[] {
   const map = new Map<string, { tot: number; intro: number }>();
   for (const r of rows) {
-    const ap = toStr(pick(r, ["Sub source", "Sub Source", "SubSource", "AP Code"]));
+    let ap = toStr(pick(r, ["AP Code", "Sub source", "Sub Source", "SubSource"]));
+    if (!ap) {
+      ap = extractApFromClientId(pick(r, ["Client Id", "Client ID", "ClientId", "Client_Id"]));
+    }
     if (!ap) continue;
     const tot = toNum(pick(r, ["Total Brk", "Total Brokerage", "Total_Brk"]));
     const intro = toNum(pick(r, ["Introducer Brk", "Introducer Brokerage", "Intro Brk"]));
