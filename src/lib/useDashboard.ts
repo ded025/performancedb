@@ -1,5 +1,5 @@
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, getSettings } from "@/lib/db";
+import { db } from "@/lib/db";
 import type { Partner } from "@/lib/types";
 import { fyMonthKeys, type FY } from "@/lib/fy";
 
