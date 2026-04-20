@@ -30,8 +30,10 @@ export const Route = createFileRoute("/uploads")({
 });
 
 function UploadsPage() {
-  const { isAdmin, loading } = useAuth();
-  if (loading) return null;
+  const { isAdmin, loading, roleLoading, user } = useAuth();
+  if (loading || roleLoading || !user) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
   if (!isAdmin) {
     throw redirect({ to: "/" });
   }
