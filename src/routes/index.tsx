@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useDashboardData } from "@/lib/useDashboard";
-import { listFYs, currentFY, monthLabelFromKey, bucketLabel, fyMonthKeys, FY_MONTH_LABELS } from "@/lib/fy";
+import { listFYs, currentFY, monthLabelFromKey, fyMonthKeys, FY_MONTH_LABELS } from "@/lib/fy";
 import { Card } from "@/components/ui/card";
 import {
   Select,
@@ -35,6 +35,9 @@ import {
   Legend,
   LineChart,
   Line,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -97,13 +100,19 @@ function Dashboard() {
         ? monthLabelFromKey(selectedMonths[0])
         : `${selectedMonths.length} months`;
 
+  // RM drilldown: if a single RM is selected, list APs and per-month revenue
+  const drilldownMonths = useMemo(
+    () => (selectedMonths.length > 0 ? selectedMonths : fyMonths),
+    [selectedMonths, fyMonths],
+  );
+
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">AP Performance Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Onboarding FY filters which APs are in scope · Report FY decides whose performance is shown
+            Choose Report FY to see that year's performance · filter by RM, onboarding FY, or specific months.
           </p>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
@@ -191,38 +200,26 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         <KPI label="Partners" value={fmt(data?.totals.partners ?? 0)} />
         <KPI label="New Onboardings" value={fmt(data?.totals.newOnboardings ?? 0)} hint={reportFY} />
         <KPI label="Accounts" value={fmt(data?.totals.accounts ?? 0)} />
         <KPI label="Active Accounts" value={fmt(data?.totals.activeAccounts ?? 0)} />
+        <KPI label="Orders" value={fmt(data?.totals.orders ?? 0)} />
         <KPI label="Revenue" value={`₹ ${fmt(data?.totals.revenue ?? 0)}`} accent />
         <KPI label="Commission" value={`₹ ${fmt(data?.totals.commission ?? 0)}`} />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <KPI
-          label="Avg Revenue / Partner"
-          value={`₹ ${fmt(data?.totals.revPerPartner ?? 0)}`}
-          hint="Across revenue-generating APs"
-        />
-        <KPI
-          label="ARPU"
-          value={`₹ ${fmt(data?.totals.arpu ?? 0)}`}
-          hint="Revenue / Active accounts"
-        />
-        <KPI
-          label="Activation Rate"
-          value={`${(data?.totals.activationRate ?? 0).toFixed(1)}%`}
-          hint="Active / Accounts opened"
-        />
+        <KPI label="Avg Revenue / Partner" value={`₹ ${fmt(data?.totals.revPerPartner ?? 0)}`} />
+        <KPI label="ARPU" value={`₹ ${fmt(data?.totals.arpu ?? 0)}`} />
+        <KPI label="Activation Rate" value={`${(data?.totals.activationRate ?? 0).toFixed(1)}%`} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2 p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold">Month-on-Month — {reportFY}</h2>
-            <div className="text-xs text-muted-foreground">Revenue, Accounts, Active</div>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -249,7 +246,6 @@ function Dashboard() {
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold">Partner Onboarding</h2>
-            <div className="text-xs text-muted-foreground">By month · {reportFY}</div>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -265,41 +261,63 @@ function Dashboard() {
         </Card>
       </div>
 
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
+      <div className="grid lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2 p-4">
+          <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold">RM-wise Revenue (Stacked) — {reportFY}</h2>
-            <p className="text-xs text-muted-foreground">Top {data?.rmNames.length ?? 0} RMs by revenue</p>
           </div>
-        </div>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={(data?.rmMonthly ?? []).map((m) => ({ ...m, label: monthLabelFromKey(m.month as string) }))}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v) => `₹ ${fmt(Number(v) || 0)}`} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {(data?.rmNames ?? []).map((rmName, i) => (
-                <Bar
-                  key={rmName}
-                  dataKey={rmName}
-                  stackId="rm"
-                  fill={RM_COLORS[i % RM_COLORS.length]}
-                  radius={i === (data?.rmNames.length ?? 0) - 1 ? [4, 4, 0, 0] : 0}
-                />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={(data?.rmMonthly ?? []).map((m) => ({ ...m, label: monthLabelFromKey(m.month as string) }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => `₹ ${fmt(Number(v) || 0)}`} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {(data?.rmNames ?? []).map((rmName, i) => (
+                  <Bar
+                    key={rmName}
+                    dataKey={rmName}
+                    stackId="rm"
+                    fill={RM_COLORS[i % RM_COLORS.length]}
+                    radius={i === (data?.rmNames.length ?? 0) - 1 ? [4, 4, 0, 0] : 0}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">RM Revenue Contribution</h2>
+          </div>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={(data?.byRM ?? []).slice(0, 8)}
+                  dataKey="revenue"
+                  nameKey="rmName"
+                  innerRadius={50}
+                  outerRadius={100}
+                  paddingAngle={2}
+                >
+                  {(data?.byRM ?? []).slice(0, 8).map((_, i) => (
+                    <Cell key={i} fill={RM_COLORS[i % RM_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => `₹ ${fmt(Number(v) || 0)}`} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
 
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="font-semibold">RM Pivot — {reportFY}</h2>
-            <p className="text-xs text-muted-foreground">Sum of accounts, active, revenue, commission and contribution</p>
-          </div>
+          <h2 className="font-semibold">RM Pivot — {reportFY}</h2>
         </div>
         <div className="overflow-x-auto">
           <Table>
@@ -309,6 +327,7 @@ function Dashboard() {
                 <TableHead className="text-right">Partners</TableHead>
                 <TableHead className="text-right">Accounts</TableHead>
                 <TableHead className="text-right">Active</TableHead>
+                <TableHead className="text-right">Orders</TableHead>
                 <TableHead className="text-right">Revenue</TableHead>
                 <TableHead className="text-right">Commission</TableHead>
                 <TableHead className="text-right">% Contribution</TableHead>
@@ -321,6 +340,7 @@ function Dashboard() {
                   <TableCell className="text-right">{fmt(r.partners)}</TableCell>
                   <TableCell className="text-right">{fmt(r.accounts)}</TableCell>
                   <TableCell className="text-right">{fmt(r.activeAccounts)}</TableCell>
+                  <TableCell className="text-right">{fmt(r.orders)}</TableCell>
                   <TableCell className="text-right">₹ {fmt(r.revenue)}</TableCell>
                   <TableCell className="text-right">₹ {fmt(r.commission)}</TableCell>
                   <TableCell className="text-right">{r.contributionPct.toFixed(1)}%</TableCell>
@@ -328,7 +348,7 @@ function Dashboard() {
               ))}
               {(!data || data.byRM.length === 0) && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
                     No data for selected filters
                   </TableCell>
                 </TableRow>
@@ -338,11 +358,58 @@ function Dashboard() {
         </div>
       </Card>
 
+      {rm !== "ALL" && data && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-semibold">{rm} — AP breakdown by month</h2>
+              <p className="text-xs text-muted-foreground">Revenue per AP across {drilldownMonths.length} month(s)</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto max-h-[500px]">
+            <Table>
+              <TableHeader className="sticky top-0 bg-card">
+                <TableRow>
+                  <TableHead>AP Code</TableHead>
+                  <TableHead>AP Name</TableHead>
+                  {drilldownMonths.map((m) => (
+                    <TableHead key={m} className="text-right">
+                      {monthLabelFromKey(m)}
+                    </TableHead>
+                  ))}
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.perAP.map((ap) => {
+                  const cells = drilldownMonths.map(
+                    (m) => ap.monthly.find((mm) => mm.month === m)?.revenue ?? 0,
+                  );
+                  const tot = cells.reduce((s, x) => s + x, 0);
+                  if (tot === 0) return null;
+                  return (
+                    <TableRow key={ap.apCode}>
+                      <TableCell className="font-mono text-xs">{ap.apCode}</TableCell>
+                      <TableCell>{ap.apName}</TableCell>
+                      {cells.map((v, i) => (
+                        <TableCell key={i} className="text-right tabular-nums">
+                          {v > 0 ? `₹ ${fmt(v)}` : "—"}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-right font-medium tabular-nums">₹ {fmt(tot)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <div>
             <h2 className="font-semibold">AP Performance — {reportFY}</h2>
-            <p className="text-xs text-muted-foreground">Bucket = floor(yearly revenue / 50,000)</p>
           </div>
           <Input
             placeholder="Search AP code, name, RM…"
@@ -361,9 +428,9 @@ function Dashboard() {
                 <TableHead>Onb FY</TableHead>
                 <TableHead className="text-right">Accounts</TableHead>
                 <TableHead className="text-right">Active</TableHead>
+                <TableHead className="text-right">Orders</TableHead>
                 <TableHead className="text-right">Revenue</TableHead>
                 <TableHead className="text-right">Commission</TableHead>
-                <TableHead>Bucket</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -375,9 +442,9 @@ function Dashboard() {
                   <TableCell className="text-xs text-muted-foreground">{a.createdFY ?? "—"}</TableCell>
                   <TableCell className="text-right">{fmt(a.accounts)}</TableCell>
                   <TableCell className="text-right">{fmt(a.activeAccounts)}</TableCell>
+                  <TableCell className="text-right">{fmt(a.orders)}</TableCell>
                   <TableCell className="text-right">₹ {fmt(a.revenue)}</TableCell>
                   <TableCell className="text-right">₹ {fmt(a.commission)}</TableCell>
-                  <TableCell className="text-xs">{bucketLabel(a.revenue)}</TableCell>
                 </TableRow>
               ))}
               {filteredAP.length === 0 && (
