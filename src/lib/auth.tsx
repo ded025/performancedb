@@ -23,13 +23,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(false);
 
   useEffect(() => {
-    // Set up listener BEFORE getSession
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
-      if (!sess?.user) setRole(null);
+      if (!sess?.user) {
+        setRole(null);
+        setRoleLoading(false);
+      }
     });
 
     supabase.auth.getSession().then(({ data }) => {
@@ -41,16 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Fetch role whenever user changes (deferred to avoid auth deadlock)
   useEffect(() => {
     if (!user) return;
+    setRoleLoading(true);
     const t = setTimeout(async () => {
       const { data } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id);
       const roles = (data ?? []).map((r) => r.role as AppRole);
-      setRole(roles.includes("admin") ? "admin" : roles.includes("viewer") ? "viewer" : "viewer");
+      setRole(roles.includes("admin") ? "admin" : "viewer");
+      setRoleLoading(false);
     }, 0);
     return () => clearTimeout(t);
   }, [user]);
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         role,
         loading,
+        roleLoading,
         isAdmin: role === "admin",
         signIn,
         signUp,
