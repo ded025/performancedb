@@ -1,11 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useLiveQuery } from "dexie-react-hooks";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { db, getSettings, setDefaultCommission } from "@/lib/db";
+import {
+  fetchSettings,
+  saveDefaultCommission,
+  clearAllMonthlyAccounts,
+  clearAllMonthlyRevenue,
+  clearHistoricalFY,
+} from "@/lib/cloudData";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { useInvalidateData } from "@/lib/useDashboard";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings — AP Performance" }] }),
@@ -13,11 +21,18 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsPage() {
-  const settings = useLiveQuery(() => getSettings());
+  const { isAdmin, loading } = useAuth();
+  const invalidate = useInvalidateData();
+  const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const [pct, setPct] = useState("20");
   useEffect(() => {
     if (settings) setPct(String(settings.defaultCommissionPct));
   }, [settings]);
+
+  if (loading) return null;
+  if (!isAdmin) {
+    throw redirect({ to: "/" });
+  }
 
   return (
     <div className="p-6 space-y-4 max-w-3xl mx-auto">
@@ -46,8 +61,13 @@ function SettingsPage() {
               onClick={async () => {
                 const n = parseFloat(pct);
                 if (isNaN(n) || n < 0 || n > 100) return toast.error("Enter 0–100");
-                await setDefaultCommission(n);
-                toast.success("Saved");
+                try {
+                  await saveDefaultCommission(n);
+                  invalidate();
+                  toast.success("Saved");
+                } catch (e) {
+                  toast.error((e as Error).message);
+                }
               }}
             >
               Save
@@ -68,8 +88,13 @@ function SettingsPage() {
             size="sm"
             onClick={async () => {
               if (!confirm("Delete ALL monthly account records?")) return;
-              await db.monthlyAccounts.clear();
-              toast.success("Cleared monthly accounts");
+              try {
+                await clearAllMonthlyAccounts();
+                invalidate();
+                toast.success("Cleared monthly accounts");
+              } catch (e) {
+                toast.error((e as Error).message);
+              }
             }}
           >
             Clear All Monthly Accounts
@@ -79,8 +104,13 @@ function SettingsPage() {
             size="sm"
             onClick={async () => {
               if (!confirm("Delete ALL monthly revenue records?")) return;
-              await db.monthlyRevenue.clear();
-              toast.success("Cleared monthly revenue");
+              try {
+                await clearAllMonthlyRevenue();
+                invalidate();
+                toast.success("Cleared monthly revenue");
+              } catch (e) {
+                toast.error((e as Error).message);
+              }
             }}
           >
             Clear All Monthly Revenue
@@ -90,8 +120,13 @@ function SettingsPage() {
             size="sm"
             onClick={async () => {
               if (!confirm("Delete FY 25-26 historical data?")) return;
-              await db.historicalFY.clear();
-              toast.success("Cleared historical");
+              try {
+                await clearHistoricalFY("FY 25-26");
+                invalidate();
+                toast.success("Cleared historical");
+              } catch (e) {
+                toast.error((e as Error).message);
+              }
             }}
           >
             Clear FY 25-26 Historical

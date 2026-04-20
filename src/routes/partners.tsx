@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { db } from "@/lib/db";
+import { fetchPartners, clearPartners } from "@/lib/cloudData";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,6 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
+import { useInvalidateData } from "@/lib/useDashboard";
 
 export const Route = createFileRoute("/partners")({
   head: () => ({ meta: [{ title: "Partners — AP Performance" }] }),
@@ -22,7 +24,9 @@ export const Route = createFileRoute("/partners")({
 });
 
 function Partners() {
-  const partners = useLiveQuery(() => db.partners.toArray()) ?? [];
+  const { isAdmin } = useAuth();
+  const invalidate = useInvalidateData();
+  const { data: partners = [] } = useQuery({ queryKey: ["partners"], queryFn: fetchPartners });
   const [q, setQ] = useState("");
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -31,7 +35,7 @@ function Partners() {
       (p) =>
         p.apCode.toLowerCase().includes(s) ||
         p.apName.toLowerCase().includes(s) ||
-        p.rmName.toLowerCase().includes(s),
+        (p.rmName ?? "").toLowerCase().includes(s),
     );
   }, [partners, q]);
 
@@ -51,17 +55,24 @@ function Partners() {
             onChange={(e) => setQ(e.target.value)}
             className="w-72 h-9"
           />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              if (!confirm("Delete ALL partner records?")) return;
-              await db.partners.clear();
-              toast.success("Cleared partner master");
-            }}
-          >
-            Clear All
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!confirm("Delete ALL partner records?")) return;
+                try {
+                  await clearPartners();
+                  invalidate();
+                  toast.success("Cleared partner master");
+                } catch (e) {
+                  toast.error((e as Error).message);
+                }
+              }}
+            >
+              Clear All
+            </Button>
+          )}
         </div>
       </div>
       <Card className="p-0 overflow-hidden">
@@ -70,13 +81,10 @@ function Partners() {
             <TableHeader className="sticky top-0 bg-card">
               <TableRow>
                 <TableHead>AP Code</TableHead>
-                <TableHead>AP Name</TableHead>
-                <TableHead>RM</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>RM Name</TableHead>
                 <TableHead>Lead Status</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Onb FY</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Comm %</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -84,23 +92,16 @@ function Partners() {
                 <TableRow key={p.apCode}>
                   <TableCell className="font-mono text-xs">{p.apCode}</TableCell>
                   <TableCell>{p.apName}</TableCell>
-                  <TableCell>{p.rmName}</TableCell>
+                  <TableCell>{p.rmName || "—"}</TableCell>
                   <TableCell>
-                    {p.leadStatus && <Badge variant="secondary">{p.leadStatus}</Badge>}
+                    {p.leadStatus ? <Badge variant="secondary">{p.leadStatus}</Badge> : "—"}
                   </TableCell>
-                  <TableCell>{p.status ?? "—"}</TableCell>
                   <TableCell>{p.createdFY ?? "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {p.createdTime ? new Date(p.createdTime).toLocaleDateString() : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {p.commissionPct != null ? `${p.commissionPct}%` : "—"}
-                  </TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                     No partners. Upload the Partner Master from Uploads.
                   </TableCell>
                 </TableRow>
