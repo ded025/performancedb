@@ -143,9 +143,13 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
   const accountsByAPMonth = new Map<string, { opened: number; firstTrades: number }>();
   const revenueByAPMonth = new Map<string, { rev: number }>();
 
+  // Restrict to AP codes that exist in the partner master (single source of truth)
+  const masterApCodes = new Set(allPartners.map((p) => p.apCode));
+
   if (!isHistorical) {
     for (const a of allMA) {
       if (!monthSet.has(a.month)) continue;
+      if (!masterApCodes.has(a.apCode)) continue;
       accountsByAPMonth.set(`${a.apCode}|${a.month}`, {
         opened: a.accountsOpened,
         firstTrades: a.firstTrades,
@@ -153,32 +157,20 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
     }
     for (const r of allMR) {
       if (!monthSet.has(r.month)) continue;
+      if (!masterApCodes.has(r.apCode)) continue;
       revenueByAPMonth.set(`${r.apCode}|${r.month}`, { rev: r.totalBrokerage });
     }
   }
 
+  // Source of truth: partner master. Only include APs that exist there.
   const apCodesInScope = new Set<string>(partnersFiltered.map((p) => p.apCode));
   if (isHistorical) {
     for (const h of allHistorical) {
+      if (!masterApCodes.has(h.apCode)) continue;
       const p = partnerByCode.get(h.apCode);
       if (filters.onboardingFY !== "ALL" && p?.createdFY !== filters.onboardingFY) continue;
       if (filters.rm !== "ALL" && p?.rmName !== filters.rm) continue;
       apCodesInScope.add(h.apCode);
-    }
-  } else {
-    for (const k of accountsByAPMonth.keys()) {
-      const ap = k.split("|")[0];
-      const p = partnerByCode.get(ap);
-      if (filters.onboardingFY !== "ALL" && p?.createdFY !== filters.onboardingFY) continue;
-      if (filters.rm !== "ALL" && p?.rmName !== filters.rm) continue;
-      apCodesInScope.add(ap);
-    }
-    for (const k of revenueByAPMonth.keys()) {
-      const ap = k.split("|")[0];
-      const p = partnerByCode.get(ap);
-      if (filters.onboardingFY !== "ALL" && p?.createdFY !== filters.onboardingFY) continue;
-      if (filters.rm !== "ALL" && p?.rmName !== filters.rm) continue;
-      apCodesInScope.add(ap);
     }
   }
 
@@ -211,10 +203,14 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
         accounts = a?.opened ?? 0;
         active = a?.firstTrades ?? 0;
         revenue = r?.rev ?? 0;
-        const pct = p?.commissionPct ?? settings.defaultCommissionPct;
-        commission = (revenue * pct) / 100;
+        if (p?.commissionPct != null) {
+          commission = (revenue * p.commissionPct) / 100;
+        } else {
+          commission = revenue * commissionRate(revenue);
+        }
       }
-      return { month: m, accounts, active, revenue, commission };
+      const orders = revenue > 0 ? revenue / REVENUE_PER_ORDER : 0;
+      return { month: m, accounts, active, revenue, commission, orders };
     });
     const filteredMonthly = monthlyArr.filter((x) => inScopeMonth(x.month));
     perAP.push({
@@ -222,11 +218,13 @@ export function useDashboardData(filters: DashboardFilters): DashboardData | und
       apName: p?.apName ?? apCode,
       rmName: p?.rmName ?? "—",
       createdFY: p?.createdFY,
+      createdTime: p?.createdTime,
       leadStatus: p?.leadStatus ?? "",
       accounts: filteredMonthly.reduce((s, x) => s + x.accounts, 0),
       activeAccounts: filteredMonthly.reduce((s, x) => s + x.active, 0),
       revenue: filteredMonthly.reduce((s, x) => s + x.revenue, 0),
       commission: filteredMonthly.reduce((s, x) => s + x.commission, 0),
+      orders: filteredMonthly.reduce((s, x) => s + x.orders, 0),
       monthly: monthlyArr,
     });
   }
