@@ -41,11 +41,34 @@ const rowToPartner = (r: PartnerRow): Partner => ({
   commissionPct: r.commission_pct ?? undefined,
 });
 
-// ---------- Partners ----------
 export async function fetchPartners(): Promise<Partner[]> {
-  const { data, error } = await supabase.from("partners").select("*");
-  if (error) throw error;
-  return (data ?? []).map((r) => rowToPartner(r as PartnerRow));
+  let allPartners: PartnerRow[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("partners")
+      .select("*")
+      .range(from, from + pageSize - 1)
+      .order("ap_code", { ascending: true });
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allPartners = [...allPartners, ...(data as PartnerRow[])];
+      from += pageSize;
+      
+      if (data.length < pageSize) {
+        hasMore = false;
+      }
+    }
+  }
+
+  return allPartners.map((r) => rowToPartner(r));
 }
 
 export async function upsertPartners(partners: Partner[]) {
