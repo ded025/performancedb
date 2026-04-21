@@ -3,8 +3,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 export type AppRole = "admin" | "viewer";
 
 const STORAGE_KEY = "ap_gate_role";
-const VIEWER_CODE = "fyerspartners";
-const ADMIN_CODE = "fyerspratik$25";
+const VIEWER_CODE = "partners";
+const ADMIN_CODE = "admin25";
 
 type AuthState = {
   role: AppRole | null;
